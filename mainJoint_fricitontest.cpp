@@ -19,7 +19,7 @@
 
 
 double frictioncompensation_stribeck(double a, double b, double s,double alpha, double v, double qdot, double ctscale, double gear_ratio);
-
+bool dataLog(Eigen::VectorXd &v, std::ofstream &f);
 
 
 int main(){
@@ -27,7 +27,7 @@ int main(){
     // //
     // TAICHI::twoOrderFilter cartPoleFilter[1];
     // set motor info
-    int motorNum = 6;
+    int motorNum = 3;
     Eigen::VectorXd motorIp = Eigen::VectorXd::Zero(motorNum);
     motorIp << 107,25,21,110,109,22;
     // motorIp << 111,106,102,19,103,104;
@@ -81,14 +81,14 @@ int main(){
     Eigen::MatrixXd para_;
     Eigen::MatrixXd para;
     // ip 111; 106; 102; 19; 103; 104; 107; 25; 21;110; 109; 22
-    para_.resize(6,5);
+    para_.resize(1,5);
     para_<<  
             1.06064804940437, -5.78371747871328, 11.7627981997819, 111.024140652399, 0.00102757671727644, 
-            0.588206167201691, -1.91293190536599, 3.99551564845588, 124.367215752539, -0.00126745046176146,
-            0.136497360057077, -1.51004884384212, 2.97111846967942, 35.5769408790899, -0.00111796156728834,
-            0.115512410406005, -1.44541794715704, 2.88933111842253, 55.0519847711033, 0.00201362083280513,
-            0.216028669928089, -0.906647952260252, 1.89722500778413, 163.227703834085, -0.000262750109186243, 
-            0.222786931108455, -0.821761343408838, 1.67176960838594, 87.5358021436918, -5.41660748130355e-05;
+            // 0.588206167201691, -1.91293190536599, 3.99551564845588, 124.367215752539, -0.00126745046176146,
+            // 0.136497360057077, -1.51004884384212, 2.97111846967942, 35.5769408790899, -0.00111796156728834,
+            // 0.115512410406005, -1.44541794715704, 2.88933111842253, 55.0519847711033, 0.00201362083280513,
+            // 0.216028669928089, -0.906647952260252, 1.89722500778413, 163.227703834085, -0.000262750109186243, 
+            // 0.222786931108455, -0.821761343408838, 1.67176960838594, 87.5358021436918, -5.41660748130355e-05;
 
             // 0.915262244625368, -5.07648023045021, 10.1374785845289, 137.244164571224, -0.000181470759139340,
             // 0.670457054616744, -1.60338091854170, 3.18061859992825, 71.5111423971947, 0.00156874260830262,
@@ -108,6 +108,9 @@ int main(){
     Eigen::VectorXd qDotCmd = Eigen::VectorXd::Zero(motorNum);
     Eigen::VectorXd currentCmd = Eigen::VectorXd::Zero(motorNum);
     Eigen::VectorXd frictioncurrentCmd = Eigen::VectorXd::Zero(motorNum);
+    Eigen::VectorXd qEst = Eigen::VectorXd::Zero(motorNum);
+    Eigen::VectorXd qDotEst = Eigen::VectorXd::Zero(motorNum);
+    Eigen::VectorXd currentEst = Eigen::VectorXd::Zero(motorNum);
     //   
     while (simCnt<simTotalNum)
     {
@@ -136,30 +139,36 @@ int main(){
         
         // --------------------friction compensation-------------------
         ////method 1
-        for (int i = 0; i < motorNum; i++){
-            // if(abs(qDotEst_kalman[i])>0.1)
-            // {
-                frictioncurrentCmd[i] = frictioncompensation_stribeck(para(i,0),para(i,1),para(i,2),para(i,3),para(i,4),qDotCmd[i],c_t_scale_[i],gear_[i]);       
-            // }else{
-            //     frictioncurrentCmd[i] = 0.0;
-            // }
-            }
+        // for (int i = 0; i < motorNum; i++){
+        //     // if(abs(qDotEst_kalman[i])>0.1)
+        //     // {
+        //         frictioncurrentCmd[i] = frictioncompensation_stribeck(para(i,0),para(i,1),para(i,2),para(i,3),para(i,4),qDotCmd[i],c_t_scale_[i],gear_[i]);       
+        //     // }else{
+        //     //     frictioncurrentCmd[i] = 0.0;
+        //     // }
+        //     }
         
-        for (int i = 0; i < motorNum; i++)
-        {
-            currentCmd[i] = frictioncurrentCmd[i];
-        }
+        // for (int i = 0; i < motorNum; i++)
+        // {
+        //     currentCmd[i] = frictioncurrentCmd[i];
+        // }
         //---------------------send Cmd--------------------
-
+        dataL[0] = timeSim;
+        dataL.block(1,0,motorNum,1) = qCmd;
+        dataL.block(1+motorNum,0,motorNum,1) = qDotCmd;
+        dataL.block(1+2*motorNum,0,motorNum,1) = currentCmd;
+        dataL.block(1+3*motorNum,0,motorNum,1) = qEst;
+        dataL.block(1+4*motorNum,0,motorNum,1) = qDotEst;
+        dataL.block(1+5*motorNum,0,motorNum,1) = currentEst;
         
         
         simCnt += 1;
         timeSim =  simCnt*timeStep;
  
-        
+        dataLog(dataL,foutData);
         
     }
-   
+    foutData.close();
     return 0;
 }
 
@@ -167,4 +176,12 @@ int main(){
 double frictioncompensation_stribeck(double a, double b, double s,double alpha, double v, double qdot,double ctscale,double gear_ratio)
 {
     return (a*qdot + b + s/(1 + exp(-alpha*(qdot + v))))/(ctscale*gear_ratio);
+}
+//logData
+bool dataLog(Eigen::VectorXd &v, std::ofstream &f){
+    for(int i=0;i<v.size();i++){
+          f<<v[i]<<" ";
+        }
+        f<<std::endl;
+    return true;
 }
